@@ -11,7 +11,6 @@ st.set_page_config(
 
 # 파일이 존재하는지 안전하게 확인하고 base64 인코딩을 반환하는 함수
 def get_image_base64(file_name):
-    # 실행 환경(Streamlit Cloud) 기준 파일 경로 설정
     base_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
     file_path = os.path.join(base_dir, file_name)
     
@@ -21,7 +20,6 @@ def get_image_base64(file_name):
         alt_ext = ".jpg" if ext.lower() in [".jpeg", ".jpg"] else ".jpeg"
         file_path = os.path.join(base_dir, name + alt_ext)
 
-    # 파일이 존재하는 경우만 Base64로 변환하여 에러 방지
     if os.path.exists(file_path):
         try:
             with open(file_path, "rb") as f:
@@ -33,10 +31,8 @@ def get_image_base64(file_name):
             return None
     return None
 
-# 사진 파일 목록
+# 남아있는 사진 3개 파일 목록
 IMAGE_FILES = [
-    "IMG_2886.jpg",
-    "IMG_2536.jpg",
     "IMG_1288.jpeg",
     "IMG_1289.jpeg",
     "D757D1CF-D980-4429-B4D0-D83D6E190D9F.jpeg"
@@ -62,6 +58,7 @@ st.markdown("""
         margin-bottom: 5px;
     }
 
+    /* 엄마를 위한 생일 편지 서브 타이틀 */
     .birthday-subtitle {
         text-align: center;
         color: #3E2723;
@@ -104,7 +101,7 @@ st.markdown("""
         display: block;
     }
 
-    /* 이미지가 없을 때 대체 출력되는 카드 스타일 */
+    /* 이미지가 없을 때 대체 출력 */
     .missing-photo {
         background: rgba(255, 255, 255, 0.7);
         border: 2px dashed #D32F2F;
@@ -139,13 +136,6 @@ st.markdown("""
         line-height: 1.8;
         font-size: 1.1rem;
         animation: letterOpenAnimation 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-
-    .letter-header {
-        font-size: 1.3rem;
-        font-weight: bold;
-        color: #B22222;
-        margin-bottom: 15px;
     }
 
     .letter-signature {
@@ -185,7 +175,7 @@ if "authenticated" not in st.session_state:
 if "letter_opened" not in st.session_state:
     st.session_state.letter_opened = False
 
-# 안전하게 비스듬한 사진을 렌더링하는 함수
+# 비스듬한 사진 렌더링 함수
 def render_tilted_photo(file_name, degrees):
     img_b64 = get_image_base64(file_name)
     if img_b64:
@@ -197,7 +187,7 @@ def render_tilted_photo(file_name, degrees):
     else:
         st.markdown(f"""
             <div class="missing-photo" style="transform: rotate({degrees}deg);">
-                📸 {file_name}<br><small>(GitHub 레포지토리에 사진을 올려주세요)</small>
+                📸 {file_name}<br><small>(GitHub에 사진 업로드 필요)</small>
             </div>
         """, unsafe_allow_html=True)
 
@@ -227,31 +217,36 @@ if not st.session_state.authenticated:
                 st.error("비밀번호가 올바르지 않습니다. 다시 시도하세요.")
 
 # ---------------------------------------------------------
-# [화면 2] 인증 후 (편지 & 양옆 비스듬한 사진 배치)
+# [화면 2] 인증 후 (편지 봉투 & 편지 열기 시 사진 함께 등장)
 # ---------------------------------------------------------
 else:
     st.markdown("<div class='birthday-title'>✨ Happy 50th Birthday Mom! ✨</div>", unsafe_allow_html=True)
-    st.markdown("<div class='birthday-subtitle'>사랑하는 엄마에게 마음을 담아 전하는 편지</div>", unsafe_allow_html=True)
+    st.markdown("<div class='birthday-subtitle'>엄마를 위한 생일 편지</div>", unsafe_allow_html=True)
 
-    # 3개 컬럼 레이아웃 (왼쪽 사진 2장 / 중앙 편지 / 오른쪽 사진 3장)
-    col_left, col_center, col_right = st.columns([1, 2, 1])
-
-    # --- [왼쪽 컬럼: 사진 2장 (비스듬히)] ---
-    with col_left:
-        render_tilted_photo(IMAGE_FILES[0], -4)
-        render_tilted_photo(IMAGE_FILES[1], 3)
-
-    # --- [중앙 컬럼: 편지] ---
-    with col_center:
-        if not st.session_state.letter_opened:
+    # 편지가 아직 열리지 않은 상태 (버튼만 화면 중앙에 배치)
+    if not st.session_state.letter_opened:
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
             st.write("")
             st.write("")
-            st.info("✉️ 아래 버튼을 누르면 편지 봉투가 열리며 편지가 나타납니다.")
+            st.info("✉️ 아래 버튼을 누르면 편지와 사진이 펼쳐집니다.")
             if st.button("✉️ [편지 봉투 열기]", use_container_width=True):
                 st.session_state.letter_opened = True
                 fire_confetti()
                 st.rerun()
-        else:
+
+    # 편지 봉투 열기를 누른 상태 (편지 + 양옆 사진 3장 등장)
+    else:
+        # 3개 컬럼 레이아웃 (왼쪽 사진 2장 / 중앙 편지 / 오른쪽 사진 1장)
+        col_left, col_center, col_right = st.columns([1, 2, 1])
+
+        # --- [왼쪽 컬럼: 사진 2장] ---
+        with col_left:
+            render_tilted_photo(IMAGE_FILES[0], -4)
+            render_tilted_photo(IMAGE_FILES[1], 3)
+
+        # --- [중앙 컬럼: 편지] ---
+        with col_center:
             letter_text = """Dear 엄마. Happy 50th's birthday.<br><br>
 I can't believe that your already half a century old. But on the bright side, you look like your in your mid 40's.<br><br>
 Anyway, I'm sorry for not writing you a letter sooner. And also not doing anything on your birthday. But I will make it up to you by getting good grades on my midterm. I'm also sorry my first semester grades.<br><br>
@@ -261,7 +256,6 @@ Thanks and happy birthday!"""
 
             st.markdown(f"""
                 <div class="letter-paper">
-                    <div class="letter-header">💌 To. My Beloved Mom</div>
                     <div>{letter_text}</div>
                     <div class="letter-signature">-Daniel-</div>
                 </div>
@@ -272,8 +266,6 @@ Thanks and happy birthday!"""
                 st.session_state.letter_opened = False
                 st.rerun()
 
-    # --- [오른쪽 컬럼: 사진 3장 (비스듬히)] ---
-    with col_right:
-        render_tilted_photo(IMAGE_FILES[2], 4)
-        render_tilted_photo(IMAGE_FILES[3], -3)
-        render_tilted_photo(IMAGE_FILES[4], 2)
+        # --- [오른쪽 컬럼: 사진 1장] ---
+        with col_right:
+            render_tilted_photo(IMAGE_FILES[2], -3)

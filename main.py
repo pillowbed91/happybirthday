@@ -9,24 +9,28 @@ st.set_page_config(
     layout="wide"
 )
 
-# 이미지 인코딩 헬퍼 함수 (파일 확장자 대소문자 보완 및 로컬 이미지 안전 로딩)
+# 파일이 존재하는지 안전하게 확인하고 base64 인코딩을 반환하는 함수
 def get_image_base64(file_name):
-    # 실행 중인 파일 경로 기준으로 이미지 검색
+    # 실행 환경(Streamlit Cloud) 기준 파일 경로 설정
     base_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
     file_path = os.path.join(base_dir, file_name)
     
-    # 파일이 존재하지 않는 경우 대소문자 차이 등 확장자 교체 시도
+    # 확장자 대소문자 차이 보완
     if not os.path.exists(file_path):
         name, ext = os.path.splitext(file_name)
-        alt_ext = ".jpg" if ext.lower() in [".jpeg", ".jpg"] else ext
+        alt_ext = ".jpg" if ext.lower() in [".jpeg", ".jpg"] else ".jpeg"
         file_path = os.path.join(base_dir, name + alt_ext)
 
+    # 파일이 존재하는 경우만 Base64로 변환하여 에러 방지
     if os.path.exists(file_path):
-        with open(file_path, "rb") as f:
-            ext_type = os.path.splitext(file_path)[1].replace('.', '').lower()
-            if ext_type == "jpg":
-                ext_type = "jpeg"
-            return f"data:image/{ext_type};base64,{base64.b64encode(f.read()).decode()}"
+        try:
+            with open(file_path, "rb") as f:
+                ext_type = os.path.splitext(file_path)[1].replace('.', '').lower()
+                if ext_type == "jpg":
+                    ext_type = "jpeg"
+                return f"data:image/{ext_type};base64,{base64.b64encode(f.read()).decode()}"
+        except Exception:
+            return None
     return None
 
 # 사진 파일 목록
@@ -60,13 +64,13 @@ st.markdown("""
 
     .birthday-subtitle {
         text-align: center;
-        color: #3E2723; /* 선명하고 어두운 색상으로 변경 */
+        color: #3E2723;
         font-size: 1.3rem;
         font-weight: 700;
         margin-bottom: 25px;
     }
 
-    /* 인증 화면 영역 텍스트 색상 강화 (배경 박스 제거) */
+    /* 인증 화면 영역 텍스트 색상 */
     .auth-section-title {
         color: #8B0000;
         font-size: 1.5rem;
@@ -74,14 +78,13 @@ st.markdown("""
         margin-bottom: 15px;
     }
 
-    /* Streamlit 입력 폼 라벨 색상 선명하게 조정 */
     .stTextInput > label {
         color: #2B1B17 !important;
         font-weight: 700 !important;
         font-size: 1.05rem !important;
     }
 
-    /* 비스듬한 폴라로이드 액자 스타일 */
+    /* 비스듬한 액자 스타일 */
     .tilted-photo {
         background: white;
         padding: 12px 12px 20px 12px;
@@ -101,7 +104,19 @@ st.markdown("""
         display: block;
     }
 
-    /* 편지 등장 애니메이션 */
+    /* 이미지가 없을 때 대체 출력되는 카드 스타일 */
+    .missing-photo {
+        background: rgba(255, 255, 255, 0.7);
+        border: 2px dashed #D32F2F;
+        padding: 20px;
+        text-align: center;
+        border-radius: 8px;
+        color: #5D4037;
+        font-weight: bold;
+        margin-bottom: 25px;
+    }
+
+    /* 편지 애니메이션 및 스타일 */
     @keyframes letterOpenAnimation {
         0% {
             opacity: 0;
@@ -113,7 +128,6 @@ st.markdown("""
         }
     }
 
-    /* 편지지 스타일 */
     .letter-paper {
         background: #FFFDF9;
         border: 2px solid #E8DCC4;
@@ -171,6 +185,22 @@ if "authenticated" not in st.session_state:
 if "letter_opened" not in st.session_state:
     st.session_state.letter_opened = False
 
+# 안전하게 비스듬한 사진을 렌더링하는 함수
+def render_tilted_photo(file_name, degrees):
+    img_b64 = get_image_base64(file_name)
+    if img_b64:
+        st.markdown(f"""
+            <div class="tilted-photo" style="transform: rotate({degrees}deg);">
+                <img src="{img_b64}">
+            </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+            <div class="missing-photo" style="transform: rotate({degrees}deg);">
+                📸 {file_name}<br><small>(GitHub 레포지토리에 사진을 올려주세요)</small>
+            </div>
+        """, unsafe_allow_html=True)
+
 # ---------------------------------------------------------
 # [화면 1] 비밀번호 인증 화면
 # ---------------------------------------------------------
@@ -208,27 +238,8 @@ else:
 
     # --- [왼쪽 컬럼: 사진 2장 (비스듬히)] ---
     with col_left:
-        # 사진 1
-        img1_b64 = get_image_base64(IMAGE_FILES[0])
-        if img1_b64:
-            st.markdown(f"""
-                <div class="tilted-photo" style="transform: rotate(-4deg);">
-                    <img src="{img1_b64}">
-                </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.image(IMAGE_FILES[0], use_container_width=True)
-
-        # 사진 2
-        img2_b64 = get_image_base64(IMAGE_FILES[1])
-        if img2_b64:
-            st.markdown(f"""
-                <div class="tilted-photo" style="transform: rotate(3deg);">
-                    <img src="{img2_b64}">
-                </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.image(IMAGE_FILES[1], use_container_width=True)
+        render_tilted_photo(IMAGE_FILES[0], -4)
+        render_tilted_photo(IMAGE_FILES[1], 3)
 
     # --- [중앙 컬럼: 편지] ---
     with col_center:
@@ -263,35 +274,6 @@ Thanks and happy birthday!"""
 
     # --- [오른쪽 컬럼: 사진 3장 (비스듬히)] ---
     with col_right:
-        # 사진 3
-        img3_b64 = get_image_base64(IMAGE_FILES[2])
-        if img3_b64:
-            st.markdown(f"""
-                <div class="tilted-photo" style="transform: rotate(4deg);">
-                    <img src="{img3_b64}">
-                </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.image(IMAGE_FILES[2], use_container_width=True)
-
-        # 사진 4
-        img4_b64 = get_image_base64(IMAGE_FILES[3])
-        if img4_b64:
-            st.markdown(f"""
-                <div class="tilted-photo" style="transform: rotate(-3deg);">
-                    <img src="{img4_b64}">
-                </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.image(IMAGE_FILES[3], use_container_width=True)
-
-        # 사진 5
-        img5_b64 = get_image_base64(IMAGE_FILES[4])
-        if img5_b64:
-            st.markdown(f"""
-                <div class="tilted-photo" style="transform: rotate(2deg);">
-                    <img src="{img5_b64}">
-                </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.image(IMAGE_FILES[4], use_container_width=True)
+        render_tilted_photo(IMAGE_FILES[2], 4)
+        render_tilted_photo(IMAGE_FILES[3], -3)
+        render_tilted_photo(IMAGE_FILES[4], 2)

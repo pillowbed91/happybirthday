@@ -9,14 +9,27 @@ st.set_page_config(
     layout="wide"
 )
 
-# 이미지 인코딩 헬퍼 함수 (로컬 이미지 파일을 HTML에 안전하게 바인딩)
-def get_image_base64(path):
-    if os.path.exists(path):
-        with open(path, "rb") as f:
-            return f"data:image/jpeg;base64,{base64.b64encode(f.read()).decode()}"
-    return "https://via.placeholder.com/400x300?text=Photo+Missing"
+# 이미지 인코딩 헬퍼 함수 (파일 확장자 대소문자 보완 및 로컬 이미지 안전 로딩)
+def get_image_base64(file_name):
+    # 실행 중인 파일 경로 기준으로 이미지 검색
+    base_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
+    file_path = os.path.join(base_dir, file_name)
+    
+    # 파일이 존재하지 않는 경우 대소문자 차이 등 확장자 교체 시도
+    if not os.path.exists(file_path):
+        name, ext = os.path.splitext(file_name)
+        alt_ext = ".jpg" if ext.lower() in [".jpeg", ".jpg"] else ext
+        file_path = os.path.join(base_dir, name + alt_ext)
 
-# 사진 파일 목록 (프로젝트 폴더 내 파일명)
+    if os.path.exists(file_path):
+        with open(file_path, "rb") as f:
+            ext_type = os.path.splitext(file_path)[1].replace('.', '').lower()
+            if ext_type == "jpg":
+                ext_type = "jpeg"
+            return f"data:image/{ext_type};base64,{base64.b64encode(f.read()).decode()}"
+    return None
+
+# 사진 파일 목록
 IMAGE_FILES = [
     "IMG_2886.jpg",
     "IMG_2536.jpg",
@@ -25,18 +38,18 @@ IMAGE_FILES = [
     "D757D1CF-D980-4429-B4D0-D83D6E190D9F.jpeg"
 ]
 
-# 2. 커스텀 CSS 및 애니메이션 설정
+# 2. 커스텀 CSS
 st.markdown("""
     <style>
-    /* 배경색 - 밝고 따뜻한 파스텔 크림/핑크 */
+    /* 전체 배경 - 따뜻하고 밝은 파스텔톤 */
     .stApp {
         background: linear-gradient(135deg, #FFF0F5 0%, #FFF8DC 100%);
     }
 
-    /* 선명하고 또렷한 타이틀 스타일 */
+    /* 선명한 상단 타이틀 */
     .birthday-title {
         text-align: center;
-        color: #B22222; /* 딥 레드 컬러로 높은 명암비 제공 */
+        color: #B22222;
         font-family: 'Arial Black', sans-serif;
         font-size: 3.2rem;
         font-weight: 900;
@@ -47,13 +60,28 @@ st.markdown("""
 
     .birthday-subtitle {
         text-align: center;
-        color: #4A4A4A;
-        font-size: 1.2rem;
-        font-weight: 600;
+        color: #3E2723; /* 선명하고 어두운 색상으로 변경 */
+        font-size: 1.3rem;
+        font-weight: 700;
         margin-bottom: 25px;
     }
 
-    /* 비스듬한 액자 스타일 */
+    /* 인증 화면 영역 텍스트 색상 강화 (배경 박스 제거) */
+    .auth-section-title {
+        color: #8B0000;
+        font-size: 1.5rem;
+        font-weight: 800;
+        margin-bottom: 15px;
+    }
+
+    /* Streamlit 입력 폼 라벨 색상 선명하게 조정 */
+    .stTextInput > label {
+        color: #2B1B17 !important;
+        font-weight: 700 !important;
+        font-size: 1.05rem !important;
+    }
+
+    /* 비스듬한 폴라로이드 액자 스타일 */
     .tilted-photo {
         background: white;
         padding: 12px 12px 20px 12px;
@@ -85,7 +113,7 @@ st.markdown("""
         }
     }
 
-    /* 고급스러운 편지지 디자인 */
+    /* 편지지 스타일 */
     .letter-paper {
         background: #FFFDF9;
         border: 2px solid #E8DCC4;
@@ -112,23 +140,10 @@ st.markdown("""
         margin-top: 20px;
         color: #B22222;
     }
-    
-    /* 비밀번호 입력 박스 중앙 정렬 및 디자인 */
-    .auth-box {
-        max-width: 450px;
-        margin: 0 auto;
-        padding: 30px;
-        background: white;
-        border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.08);
-    }
     </style>
-    
-    <!-- Canvas-Confetti (적절한 축하 폭죽 JS 라이브러리) -->
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
 """, unsafe_allow_html=True)
 
-# 폭죽 효과 실행 함수
+# 폭죽 효과 함수
 def fire_confetti():
     st.components.v1.html("""
         <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
@@ -166,10 +181,8 @@ if not st.session_state.authenticated:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.write("")
-        st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
-        st.subheader("🔒 비밀번호 인증")
+        st.markdown("<div class='auth-section-title'>🔒 비밀번호 인증</div>", unsafe_allow_html=True)
         
-        # 비밀번호 입력창 (힌트 및 예시 제공)
         password_input = st.text_input(
             label="비밀번호를 입력하세요 (힌트: koo's bd)",
             placeholder="(0000.00.00)",
@@ -182,38 +195,42 @@ if not st.session_state.authenticated:
                 st.rerun()
             else:
                 st.error("비밀번호가 올바르지 않습니다. 다시 시도하세요.")
-        st.markdown("</div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# [화면 2] 인증 후 (편지 및 양옆 비스듬한 사진배치)
+# [화면 2] 인증 후 (편지 & 양옆 비스듬한 사진 배치)
 # ---------------------------------------------------------
 else:
-    # 선명한 축하 헤더
     st.markdown("<div class='birthday-title'>✨ Happy 50th Birthday Mom! ✨</div>", unsafe_allow_html=True)
     st.markdown("<div class='birthday-subtitle'>사랑하는 엄마에게 마음을 담아 전하는 편지</div>", unsafe_allow_html=True)
 
-    # 3개 컬럼 레이아웃 (왼쪽 사진들 / 중앙 편지 / 오른쪽 사진들)
+    # 3개 컬럼 레이아웃 (왼쪽 사진 2장 / 중앙 편지 / 오른쪽 사진 3장)
     col_left, col_center, col_right = st.columns([1, 2, 1])
 
     # --- [왼쪽 컬럼: 사진 2장 (비스듬히)] ---
     with col_left:
-        # 사진 1 (왼쪽으로 4도 기울임)
+        # 사진 1
         img1_b64 = get_image_base64(IMAGE_FILES[0])
-        st.markdown(f"""
-            <div class="tilted-photo" style="transform: rotate(-4deg);">
-                <img src="{img1_b64}">
-            </div>
-        """, unsafe_allow_html=True)
+        if img1_b64:
+            st.markdown(f"""
+                <div class="tilted-photo" style="transform: rotate(-4deg);">
+                    <img src="{img1_b64}">
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.image(IMAGE_FILES[0], use_container_width=True)
 
-        # 사진 2 (오른쪽으로 3도 기울임)
+        # 사진 2
         img2_b64 = get_image_base64(IMAGE_FILES[1])
-        st.markdown(f"""
-            <div class="tilted-photo" style="transform: rotate(3deg);">
-                <img src="{img2_b64}">
-            </div>
-        """, unsafe_allow_html=True)
+        if img2_b64:
+            st.markdown(f"""
+                <div class="tilted-photo" style="transform: rotate(3deg);">
+                    <img src="{img2_b64}">
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.image(IMAGE_FILES[1], use_container_width=True)
 
-    # --- [중앙 컬럼: 편지 봉투 인터랙션 및 편지] ---
+    # --- [중앙 컬럼: 편지] ---
     with col_center:
         if not st.session_state.letter_opened:
             st.write("")
@@ -221,10 +238,9 @@ else:
             st.info("✉️ 아래 버튼을 누르면 편지 봉투가 열리며 편지가 나타납니다.")
             if st.button("✉️ [편지 봉투 열기]", use_container_width=True):
                 st.session_state.letter_opened = True
-                fire_confetti()  # 폭죽 효과 발사
+                fire_confetti()
                 st.rerun()
         else:
-            # 편지 오픈 완료 시 (봉투는 사라지고 편지만 애니메이션으로 등장)
             letter_text = """Dear 엄마. Happy 50th's birthday.<br><br>
 I can't believe that your already half a century old. But on the bright side, you look like your in your mid 40's.<br><br>
 Anyway, I'm sorry for not writing you a letter sooner. And also not doing anything on your birthday. But I will make it up to you by getting good grades on my midterm. I'm also sorry my first semester grades.<br><br>
@@ -247,26 +263,35 @@ Thanks and happy birthday!"""
 
     # --- [오른쪽 컬럼: 사진 3장 (비스듬히)] ---
     with col_right:
-        # 사진 3 (오른쪽으로 4도 기울임)
+        # 사진 3
         img3_b64 = get_image_base64(IMAGE_FILES[2])
-        st.markdown(f"""
-            <div class="tilted-photo" style="transform: rotate(4deg);">
-                <img src="{img3_b64}">
-            </div>
-        """, unsafe_allow_html=True)
+        if img3_b64:
+            st.markdown(f"""
+                <div class="tilted-photo" style="transform: rotate(4deg);">
+                    <img src="{img3_b64}">
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.image(IMAGE_FILES[2], use_container_width=True)
 
-        # 사진 4 (왼쪽으로 3도 기울임)
+        # 사진 4
         img4_b64 = get_image_base64(IMAGE_FILES[3])
-        st.markdown(f"""
-            <div class="tilted-photo" style="transform: rotate(-3deg);">
-                <img src="{img4_b64}">
-            </div>
-        """, unsafe_allow_html=True)
+        if img4_b64:
+            st.markdown(f"""
+                <div class="tilted-photo" style="transform: rotate(-3deg);">
+                    <img src="{img4_b64}">
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.image(IMAGE_FILES[3], use_container_width=True)
 
-        # 사진 5 (오른쪽으로 2도 기울임)
+        # 사진 5
         img5_b64 = get_image_base64(IMAGE_FILES[4])
-        st.markdown(f"""
-            <div class="tilted-photo" style="transform: rotate(2deg);">
-                <img src="{img5_b64}">
-            </div>
-        """, unsafe_allow_html=True)
+        if img5_b64:
+            st.markdown(f"""
+                <div class="tilted-photo" style="transform: rotate(2deg);">
+                    <img src="{img5_b64}">
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.image(IMAGE_FILES[4], use_container_width=True)
